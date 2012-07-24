@@ -7,11 +7,14 @@ import gdata.sample_util
 import gdata.data
 import atom.data
 import sys
+import gdata.photos.service
+import gdata.media
+import gdata.geo
 
 class Blogger:
 
 
-	def __init__(self, title=None, body=None, editlink=None):
+	def __init__(self, title=None, body=None, editlink=None, upload=None):
 		self.client = gdata.blogger.client.BloggerClient()
 		gdata.sample_util.authorize_client(
 			self.client, service='blogger', source='0xPr0xy_blogger_cli',
@@ -28,6 +31,8 @@ class Blogger:
 
 		if editlink is not None: self.editlink = editlink
 		else: self.editlink = False
+		
+		if upload is not None: self.upload = upload
 
 		self.execute()
 
@@ -68,14 +73,19 @@ class Blogger:
 
 	def execute(self):
 		""" determine what method to call """
-		if self.title and self.body:
+		if self.title and self.body and self.upload:
+			with open(self.upload, "rb") as f:
+				data = f.read()
+				img = data.encode("base64")
+				self.createPost(self.title, '<p>' + self.body + '</p><img src=\'data:image/gif;base64,' + img + '\'/>')
+		elif self.title and self.body:
 			self.createPost(self.title, self.body)
 		elif self.editlink:
 			self.deletePost(self.editlink)
 		else: self.printBlogPosts()
 
-
-
+if len(sys.argv) == 4:
+	instance = Blogger(sys.argv[1], sys.argv[2], None, sys.argv[3])
 if len(sys.argv) == 3:
 	instance = Blogger(sys.argv[1], sys.argv[2], None)
 if len(sys.argv) == 2:
