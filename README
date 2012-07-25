@@ -8,7 +8,7 @@ Google Account
 
 Commands:
 ---------
-view posts 				./blogger
+view posts 			./blogger
 create post 			./blogger '<title>' "<body>"
 create post with image		./blogger '<title>' "<body>" '<image>'
 
