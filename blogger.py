@@ -10,11 +10,53 @@ import sys
 import gdata.photos.service
 import gdata.media
 import gdata.geo
+import urwid
+
+
+class ItemWidget (urwid.WidgetWrap):
+
+    def __init__ (self, description=None, id=None):
+        
+        if id is not None and description is not None:
+
+        	self.content = 'Post %s: %s...' % (str(id), description)
+        	self.item = [
+            	('fixed', 15, urwid.Padding(urwid.AttrWrap(
+            	urwid.Text('Post %s' % str(id)), 'body', 'focus'), left=2)),
+            	urwid.AttrWrap(urwid.Text('%s' % description), 'body', 'focus'),
+
+        	]
+        
+        elif description is not None:
+
+        	self.content = '%s' % description #limit content? [:25]
+        	self.item = [
+        		urwid.Padding(urwid.AttrWrap(
+        		urwid.Text('%s' % description),  'body', 'focus'),  left=15),
+        	]
+
+        else:
+
+        	self.item = [
+        		urwid.Padding(urwid.AttrWrap(
+        		urwid.Divider(u'-'),  'body', 'head'),  left=15),
+        	]
+        
+        w = urwid.Columns(self.item)
+        self.__super.__init__(w)
+
+    def selectable (self):
+        return True
+
+    def keypress(self, size, key):
+        return key
+
 
 class Blogger:
 
 
-	def __init__(self, title=None, body=None, editlink=None, upload=None):
+	def __init__(self, title=None, body=None, editlink=None):
+
 		self.client = gdata.blogger.client.BloggerClient()
 		gdata.sample_util.authorize_client(
 			self.client, service='blogger', source='0xPr0xy_blogger_cli',
@@ -32,8 +74,8 @@ class Blogger:
 		if editlink is not None: self.editlink = editlink
 		else: self.editlink = False
 		
-		if upload is not None: self.upload = upload
-
+		self.count = 1
+		
 		self.execute()
 
 
@@ -47,12 +89,32 @@ class Blogger:
 
 	def printBlogPosts(self):
 		""" print all posts of blog """
+		
 		feed = self.client.get_posts(self.blog_id)
-		for entry in feed.entry:
-			print "\n" + entry.title.text + "\n-------------------------"
-			print entry.content.text
-			print entry.FindEditLink() + "\n"
+		
+		self.palette = [
+			('body','dark cyan', '', 'standout'),
+			('focus','dark red', '', 'standout'),
+			('head','light red', 'black'),
+		]	
 
+
+		self.blogitems = []
+		
+
+		for entry in feed.entry:
+
+			self.blogitems.append(ItemWidget(entry.title.text, self.count))
+			self.blogitems.append(ItemWidget(entry.content.text, None))
+			self.blogitems.append(ItemWidget(entry.FindEditLink(), None))
+			self.blogitems.append(ItemWidget(None,None))
+			self.count += 1
+		
+		self.header = urwid.AttrMap(urwid.Text('selected:'), 'head')
+		self.listbox = urwid.ListBox(urwid.SimpleListWalker(self.blogitems))
+		self.view = urwid.Frame(urwid.AttrWrap(self.listbox, 'body'), header=self.header)
+		self.loop = urwid.MainLoop(self.view, self.palette, unhandled_input=self.keystroke)
+		self.loop.run()
 
 	def createPost(self, title, body):
 		""" create new post as draft or published """
@@ -73,19 +135,45 @@ class Blogger:
 
 	def execute(self):
 		""" determine what method to call """
-		if self.title and self.body and self.upload:
-			with open(self.upload, "rb") as f:
-				data = f.read()
-				img = data.encode("base64")
-				self.createPost(self.title, '<p>' + self.body + '</p><img src=\'data:image/gif;base64,' + img + '\'/>')
-		elif self.title and self.body:
+		if self.title and self.body:
 			self.createPost(self.title, self.body)
 		elif self.editlink:
 			self.deletePost(self.editlink)
 		else: self.printBlogPosts()
 
-if len(sys.argv) == 4:
-	instance = Blogger(sys.argv[1], sys.argv[2], None, sys.argv[3])
+
+	def keystroke (self,input):
+
+		
+		if input in ('q', 'Q'):
+			raise urwid.ExitMainLoop()
+
+		if input is 'enter':
+			
+			try:
+				self.focus = self.listbox.get_focus()[0].content
+			except Exception as e:
+				pass
+
+			self.view.set_header(urwid.AttrWrap(urwid.Text(
+				'selected: %s' % str(self.focus)), 'head'))
+
+		if input is 'backspace':
+			
+			try:
+				self.focus = str(self.listbox.get_focus()[0].content)
+			except Exception as e:
+				pass
+
+			try: 
+				self.focus.index('blogger')
+				self.deletePost(self.focus)
+				sys.exit('deleted: %s' % self.focus)
+			except ValueError:
+				self.view.set_header(urwid.AttrWrap(urwid.Text(
+				'NO DELETE LINK!'), 'head'))
+
+
 if len(sys.argv) == 3:
 	instance = Blogger(sys.argv[1], sys.argv[2], None)
 if len(sys.argv) == 2:
