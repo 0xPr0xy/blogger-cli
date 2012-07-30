@@ -37,26 +37,23 @@ class Picasa:
 
 class ItemWidget (urwid.WidgetWrap):
 
-    def __init__ (self, description=None, id=None):
+    def __init__ (self, entry, detail=None):
         
-        if id is not None and description is not None:
-        	self.content = 'Post %s: %s...' % (str(id), description)
-        	self.item = [
-            	('fixed', 15, urwid.Padding(urwid.AttrWrap(
-            	urwid.Text('Post %s' % str(id)), 'body', 'focus'), left=2)),
-            	urwid.AttrWrap(urwid.Text('%s' % description), 'body', 'focus'),
-        	]
-        elif description is not None:
-        	self.content = '%s' % description #limit content? [:25]
+        #list view
+        if entry is not None and detail is None:
+        	self.open = entry #limit content? [:25]
+        	self.remove = entry.FindEditLink()
         	self.item = [
         		urwid.Padding(urwid.AttrWrap(
-        		urwid.Text('%s' % description),  'body', 'focus'),  left=15),
+        		urwid.Text('%s' % entry.title.text),  'body', 'focus'),  left=2),
         	]
-        else:
+        #detail view
+        elif entry is not None and detail is not None:
         	self.item = [
         		urwid.Padding(urwid.AttrWrap(
-        		urwid.Divider(u'-'),  'body', 'head'),  left=15),
+        		urwid.Text('%s' % entry),  'body', 'focus'),  left=2),
         	]
+
         w = urwid.Columns(self.item)
         self.__super.__init__(w)
 
@@ -97,13 +94,15 @@ class Blogger:
 		self.execute()
 
 
-	def printBlogs(self):
-		""" print list of users blogs """
-		feed = self.client.get_blogs()
-		print feed.title.text
-		for entry in feed.entry:
-			print "\t" + entry.title.text
-
+	def openBlogPost(self, entry):
+		"""open blog post view content"""
+		self.detail = []
+		self.detail.append(ItemWidget(entry.title.text, 'detail'))
+		self.detail.append(ItemWidget(entry.content.text, 'detail'))
+		self.listbox = urwid.ListBox(urwid.SimpleListWalker(self.detail))
+		self.view = urwid.Frame(urwid.AttrWrap(self.listbox, 'body'))
+		self.loop = urwid.MainLoop(self.view, self.palette, unhandled_input=self.returnToList)
+		self.loop.run()
 
 	def printBlogPosts(self):
 		""" open all posts of blog in urwid interface """
@@ -117,17 +116,14 @@ class Blogger:
 		self.blogitems = []
 		for entry in feed.entry:
 
-			self.blogitems.append(ItemWidget(entry.title.text, self.count))
-			self.blogitems.append(ItemWidget(entry.content.text, None))
-			self.blogitems.append(ItemWidget(entry.FindEditLink(), None))
-			self.blogitems.append(ItemWidget(None,None))
+			self.blogitems.append(ItemWidget(entry))
 			self.count += 1
 		
-		self.header = urwid.AttrMap(urwid.Text('selected:'), 'head')
 		self.listbox = urwid.ListBox(urwid.SimpleListWalker(self.blogitems))
-		self.view = urwid.Frame(urwid.AttrWrap(self.listbox, 'body'), header=self.header)
+		self.view = urwid.Frame(urwid.AttrWrap(self.listbox, 'body'))
 		self.loop = urwid.MainLoop(self.view, self.palette, unhandled_input=self.keystroke)
 		self.loop.run()
+
 
 	def createPost(self, title, body):
 		""" create new post as draft or published """
@@ -140,6 +136,7 @@ class Blogger:
 		imageurl = pic.upload(filename, title)
 		body += '<p><img src=\'' + imageurl + '\'/></p>'
 		return self.client.add_post(self.blog_id, title, body, draft=False)
+
 
 	def deletePost(self, post_entry):
 		""" remove post """
@@ -164,6 +161,12 @@ class Blogger:
 		else: self.printBlogPosts()
 
 
+	def returnToList (self,input):
+		""" handle keystrokes """
+		
+		if input in ('q', 'Q'):
+			self.printBlogPosts()
+
 	def keystroke (self,input):
 		""" handle keystrokes """
 		
@@ -172,15 +175,16 @@ class Blogger:
 		
 		if input is 'enter':
 			try:
-				self.focus = self.listbox.get_focus()[0].content
+				self.focus = self.listbox.get_focus()[0].open
 			except Exception as e:
 				pass
-			self.view.set_header(urwid.AttrWrap(urwid.Text(
-				'selected: %s' % str(self.focus)), 'head'))
+			#self.view.set_header(urwid.AttrWrap(urwid.Text(
+			#	'selected: %s' % str(self.focus)), 'head'))
+			self.openBlogPost(self.focus)
 
 		if input is 'backspace':	
 			try:
-				self.focus = str(self.listbox.get_focus()[0].content)
+				self.focus = str(self.listbox.get_focus()[0].remove)
 			except Exception as e:
 				pass
 			try: 

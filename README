@@ -17,8 +17,9 @@ Controls:
 ---------
 up = scroll up
 down = scroll down
-q = quit
-backspace on link = delete post
+enter = post details
+backspace = remove post (and from detail view does nothing)
+q = quit (and from detail view returns to list)
 
 
 Example usage:
