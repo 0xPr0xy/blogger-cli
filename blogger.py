@@ -178,8 +178,6 @@ class Blogger:
 				self.focus = self.listbox.get_focus()[0].open
 			except Exception as e:
 				pass
-			#self.view.set_header(urwid.AttrWrap(urwid.Text(
-			#	'selected: %s' % str(self.focus)), 'head'))
 			self.openBlogPost(self.focus)
 
 		if input is 'backspace':	
